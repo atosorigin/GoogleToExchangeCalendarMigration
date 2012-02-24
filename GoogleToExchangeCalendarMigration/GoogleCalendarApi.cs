@@ -7,13 +7,17 @@ using Google.GData.Contacts;
 using Google.GData.Client;
 using Google.GData.Extensions;
 using Google.GData.Calendar;
+using log4net;
+using log4net.Config;
 
 
 namespace ConsoleApplication1
 {
     class GoogleCalendarApi
     {
+        protected static readonly ILog log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         CalendarService service;
+        ExchangeWriter writer;
 
         public GoogleCalendarApi()
         {
@@ -40,6 +44,7 @@ namespace ConsoleApplication1
         public void AuthenticateV2()
         {
             // create an OAuth factory to use
+            log.Debug("Authenticating to calendar service using 2-legged OAuth");
             GOAuthRequestFactory requestFactory = new GOAuthRequestFactory("cl", "MyApp");
             requestFactory.ConsumerKey = ConfigurationManager.AppSettings["consumerKey"];
             requestFactory.ConsumerSecret = ConfigurationManager.AppSettings["consumerSecret"];
@@ -62,43 +67,50 @@ namespace ConsoleApplication1
             CalendarFeed feed = service.Query(query);
             foreach (CalendarEntry entry in feed.Entries)
             {
-                Console.WriteLine(entry.Title.Text);
+                log.Debug("Calendar title from GetCalendarFeed: " + entry.Title.Text);
             }
-            Console.WriteLine("Query Success!");
-            Console.ReadLine();
         }
 
         public void WriteEventInformation()
         {
+            log.Debug("Attempting to write all calendar information for user.....");
             EventQuery query = new EventQuery();
             query.Uri = new Uri("https://www.google.com/calendar/feeds/david.turner_adm@mandc-test.com/private/full?xoauth_requestor_id=david.turner_adm@mandc-test.com");
             // Tell the service to query:
             EventFeed calFeed = service.Query(query);
+            int i = 0;
+            writer = new ExchangeWriter();
+            List<String> List = new List<String>();
             foreach (EventEntry entry in calFeed.Entries)
-            {
-              
-              //  GetCalendarId(entry);
-              //  GetEventId(entry);
-              //  WriteCreatorDisplayName(entry);
-              //  WriteEventId(entry);
-              //  WriteUpdatedDateTimeW(entry);
-              //  WriteDescription(entry);
-              //  WriteTitleOrSummary(entry);
-              //  WriteEventStatus( entry);
-              //  WriteRecurrenceDetails(entry);
-              //  WriteTransparency(entry);
-              //  WriteVisibility(entry);
-              //  WriteStartDateAndTime(entry);
-              //  WriteEndDateAndTime(entry);
-              //  WriteEventAllDay(entry);
-              //  WriteLocation(entry);
-              //  WriteEndTimeZone(entry);
-              //  WriteReminders(entry);
-              //  WriteAttendees(entry);
-                WriteGuestsCanModify(entry);
+            {  
+ 
+                if(List.Contains(entry.EventId) == false){
+                List.Add(entry.EventId);
+                log.Debug("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   ");
+                log.Debug("Calendar entry number: " + (i++));              
+                log.Debug("Calendar entry title = " + entry.Title.Text);
+                WriteTitleOrSummary(entry);//DONE - works
+                GetCalendarId(entry);//not needed
+                GetEventId(entry);//not needed
+                WriteCreatorDisplayName(entry);//Cannot directly write it to exchange as exchange treate the organisor as the creator
+                WriteEventId(entry);//not needed
+                WriteUpdatedDateTimeW(entry);//don't think this is needed 
+                WriteDescription(entry); // DONE - works            
+                WriteEventStatus( entry); // i.e. confirmed
+                WriteRecurrenceDetails(entry);// TODO
+                WriteTransparency(entry); //i.e  opaque
+                WriteVisibility(entry); //i.e. default
+                WriteStartDateAndTime(entry);//DONE - works although need to test dif time zones
+                WriteEndDateAndTime(entry);//DONE - works although need to test dif time zones
+                WriteEventAllDay(entry);//DONE - works
+                WriteLocation(entry); //DONE - works
+                WriteEndTimeZone(entry);
+                WriteReminders(entry); //DONE - works
+                WriteAttendees(entry); //SO FAR HAVE WRITTEN ALL ATTENDEES AS OPTIONAL ATTENDEES
+                WriteGuestsCanModify(entry); //STILL NEED TO GET DATA FROM GOOGLE
 
-                Console.WriteLine();
-                Console.WriteLine(entry.Title.Text);
+                writer.SaveAndResetAppointment();
+                }
             }
         }
 
@@ -108,165 +120,137 @@ namespace ConsoleApplication1
         }
 
         private void WriteCreatorDisplayName(EventEntry entry)
-        {
-            Console.WriteLine("********  DISPLAY NAME    ***********");     
-            Console.WriteLine(entry.Authors[0].Name);
-            Console.WriteLine("*******************");
-
+        { 
+            log.Debug("Creator display name = " + entry.Authors[0].Name);
         }
         private void WriteCreatorEmail(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine(entry.Authors[0].Email);
-            Console.WriteLine("*******************");
-
+            log.Debug("Creator email " + entry.Authors[0].Email);
         }
         private void WriteEventId(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine(entry.EventId);
-            Console.WriteLine("*******************");
-
+            log.Debug("Calendar event Id = " + entry.EventId);
         }
         private void WriteUpdatedDateTimeW(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine(entry.Updated);
-            Console.WriteLine("*******************");
+            log.Debug("Calendar updated DateTimeW = " + entry.Updated);
         }
         /****PROB NOT NEED *****/
         private void WriteEventKind(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine("*******************");
+            log.Debug("********        ***********");
+            log.Debug("*******************");
         }
         /*** CANT GET ANYTHING MEANINGFUL ******/
         private void WriteDescription(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine(entry.Content.Src);
-            Console.WriteLine("*******************");
+            log.Debug("Calendar event description = " + entry.Content.Content);
+            writer.WriteDescription(entry.Content.Content);
         }
 
         private void WriteTitleOrSummary(EventEntry entry)
         {
-            Console.WriteLine("********TITLE OR SUMMARY***********");
-            Console.WriteLine(entry.Title.Text);
-            Console.WriteLine("*******************");
+            log.Debug("Calendar event title or summary = " + entry.Title.Text);
+            writer.WriteTitle(entry.Title.Text);
+
         }
         private void WriteEventStatus(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine(entry.Status.Value); //i.e. event confirmed
-            Console.WriteLine("*******************");
+            log.Debug("Calendar event status = " + entry.Status.Value); //i.e. event confirmed
         }
         /***CANT AS YET FIND THIS VALUE****/
         private void WritePrivateValue(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine();
-            Console.WriteLine("*******************");
+            log.Debug("Private value = ");
+
         }
         private void WriteRecurrenceDetails(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            if (entry.Recurrence!=null && entry.Recurrence.Value!=null)
+
+            if (entry.Recurrence!=null && entry.Recurrence.Value!=null)             
             {
-                Console.WriteLine(entry.Recurrence.Value);// DTSTART:20120128T090000Z     DTEND:20120128T100000Z     RRULE:FREQ=WEEKLY;INTERVAL=5;BYDAY=MO,SA
+                log.Debug("Recurrence details = " + entry.Recurrence.Value);// DTSTART:20120128T090000Z     DTEND:20120128T100000Z     RRULE:FREQ=WEEKLY;INTERVAL=5;BYDAY=MO,SA
+                writer.WriteRecurrence(entry.Recurrence.Value);
             }           
-            Console.WriteLine("*******************");
+
         }
         private void WriteTransparency(EventEntry entry)
         {
-            Console.WriteLine("******** TRANSPARENCY    ***********");
-            Console.WriteLine(entry.EventTransparency.Value); //i.e. opaque, transparent
-            Console.WriteLine("*******************");
+            log.Debug("Transparency (opaque or transparent) = " + entry.EventTransparency.Value); //i.e. opaque, transparent
         }
         private void WriteVisibility(EventEntry entry)
         {
-            Console.WriteLine("******** VISIBILITY       ***********");
-            Console.WriteLine(entry.EventVisibility.Value); // private, default or public
-            Console.WriteLine("*******************");
+            log.Debug("Calendar event visibility = " + entry.EventVisibility.Value); // private, default or public
         }
         private void WriteStartDateAndTime(EventEntry entry)
         {
-            Console.WriteLine("******** DATE EVENT BEGINS ***********");
             if (entry.Times != null && entry.Times.Count > 0)
             {
-                Console.WriteLine(entry.Times[0].StartTime);
+                log.Debug("Calendar event start date and time = " + entry.Times[0].StartTime);
+                writer.WriteStartDate(entry.Times[0].StartTime);
             }
-            
-            Console.WriteLine("*******************");
         }
         private void WriteEndDateAndTime(EventEntry entry)
         {
-            Console.WriteLine("******** DATE EVENT ENDS   ***********");
             if (entry.Times != null && entry.Times.Count > 0)
             {
-                Console.WriteLine(entry.Times[0].EndTime);
+                log.Debug("Calendar event end date and time = " + entry.Times[0].EndTime);
+                writer.WriteEndDate(entry.Times[0].EndTime);
             }
-            Console.WriteLine("*******************");
         }
 
         private void WriteEventAllDay(EventEntry entry)
         {
-            Console.WriteLine("******** IS EVENT ALL DAY   ***********");
             if (entry.Times != null && entry.Times.Count > 0)
             {
-                Console.WriteLine(entry.Times[0].AllDay);
+                log.Debug("Is calendar event an all day event? = " + entry.Times[0].AllDay);
+                writer.WriteIsAllDayEvent(entry.Times[0].AllDay);
             }
-            
-            Console.WriteLine("*******************");
         }
         /*********STILL NEED TO IMPLEMENT - CANT SEE TIME ZONE IN ENTRY.TIME**********/
         private void WriteEndTimeZone(EventEntry entry)
         {
-            Console.WriteLine("********  TIME ZONE      ***********");           
+       
             if (entry.Times != null && entry.Times.Count > 0)
             {               
-               Console.WriteLine(entry.Times[0].EndTime); // output gd
+               log.Debug("End time zone = " + entry.Times[0].EndTime); // output gd
             }
-            Console.WriteLine("*******************");
         }
         /*********STILL NEED TO IMPLEMENT - CANT SEE TIME ZONE IN ENTRY.TIME**********/
         private void WriteStartTimeZone(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine();
-            Console.WriteLine("*******************");
+            log.Debug("Start time zone");
         }
 
         private void WriteReminders(EventEntry entry)
         {
-            Console.WriteLine("********  REMINDERS     ***********");
+            log.Debug("********  REMINDERS     ***********");
  
             foreach (Reminder rem in entry.Reminders)
             {
                 //FOR SOME REASSON REMINDER ARE INCLUDED TWICE SO ONLY INCLUDE FIRST HALF ON ITERATION
-                Console.WriteLine("Abosolute time " + rem.AbsoluteTime);// minutes, hours, days, weeks are option in the drop down; email or popup;type number for the minutes
-                Console.WriteLine("Days " + rem.Days);// RETURNS 0
-                Console.WriteLine("Hours " + rem.Hours);// RETURNS 0
-                Console.WriteLine("Minutes " + rem.Minutes);//this is the only one used NOT DAYS OR HOURS OR ABSOLUTE TIME
-                Console.WriteLine("Method " + rem.Method);//alert(called pop-up in calendar) or email
+                log.Debug("Abosolute time of reminder " + rem.AbsoluteTime);// minutes, hours, days, weeks are option in the drop down; email or popup;type number for the minutes
+                log.Debug("Days of reminder " + rem.Days);// RETURNS 0
+                log.Debug("Hours of reminder " + rem.Hours);// RETURNS 0
+                log.Debug("Minutes of reminder " + rem.Minutes);//this is the only one used NOT DAYS OR HOURS OR ABSOLUTE TIME
+                log.Debug("Method of reminder " + rem.Method);//alert(called pop-up in calendar) or email
+                writer.WriteReminder(rem.Minutes);
             }
-            Console.WriteLine("*******************");
+
         }
         private void WriteLocation(EventEntry entry)
-        {
-            Console.WriteLine("******** LOCATION    ***********");
-
-            
+        {            
             foreach (Where loc in entry.Locations)
             {
-                Console.WriteLine(loc.ValueString); //location
+                log.Debug("Location = " + loc.ValueString);
+                writer.WriteLocation(loc.ValueString);
             }
-            Console.WriteLine("*******************");
         }
 
         /***** WHAT ARE CONTRIBUTES?******/
         private void WriteAttendees(EventEntry entry)
         {
-            Console.WriteLine("********  ATTENDEES      ***********");
+            log.Debug("Writing Attendees");
 
             foreach (Who cont in entry.Participants)
             {
@@ -276,60 +260,55 @@ namespace ConsoleApplication1
                                                 //MESSAGE_BCC, MESSAGE_CC, MESSAGE_FROM, MESSAGE_REPLY_TO, MESSAGE_TO, TASK_ASSIGNED_TO
                 if (cont.Attendee_Status != null)
                 {
-                    Console.WriteLine("Status = " + cont.Attendee_Status.Value);                 
-                }
-             
+                    log.Debug("Attendee status = " + cont.Attendee_Status.Value);
+                    if (cont.Attendee_Status.Value.Contains("invited"))
+                    {
+                    }
+                    if (cont.Attendee_Status.Value.Contains("declined"))
+                    {
+                    }
+                    if (cont.Attendee_Status.Value.Contains("tentative"))
+                    {
+                    }
+                    if (cont.Attendee_Status.Value.Contains("accepted"))
+                    {
+
+                    }
+                }            
                 if (cont.Attendee_Type!=null)
                 {
-                    Console.WriteLine("Type = " + cont.Attendee_Type.Value);//DOESNT RETURN ANY VALUE??? should be optional or required
+                    log.Debug("Attendee type = " + cont.Attendee_Type.Value); //DOESNT RETURN ANY VALUE??? should be optional or required
                 }
-                
-                Console.WriteLine("email = " + cont.Email);
-                Console.WriteLine("rel = " + cont.Rel);
-                Console.WriteLine("Name of attendee = " + cont.ValueString);
+                log.Debug("Attendee email = " + cont.Email);
+                log.Debug("Attendee rel = " + cont.Rel);//attended, organiser
+                log.Debug("Name of attendee = " + cont.ValueString);
+                writer.WriteOptionalAttendee(cont.Email);
             }
-            
-            Console.WriteLine("*******************");
         }
         /***STILL NEED TO IMPLEMENT******/
         private void WriteGuestsCanModify(EventEntry entry)
         {
-            Console.WriteLine("********   GUESTS CAN MODIFY??     ***********");
-                   Console.WriteLine(entry.);         
-            Console.WriteLine("*******************");
+            log.Debug("Guests can modify? = ");
         }
          /***STILL NEED TO IMPLEMENT******/
         private void WriteGuestsCanInviteOthers(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine();
-            Console.WriteLine("*******************");
+            log.Debug("Guests can invite others? = ");
+
         }
           /***STILL NEED TO IMPLEMENT******/
         private void WriteGuestsCanSeeOtherGuests(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-            Console.WriteLine();
-            Console.WriteLine("*******************");
+            log.Debug("Guests can see other guests? = ");
         }
 
         private void GetEventId(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-          
-            Console.WriteLine(entry.EventId);
-
-            Console.WriteLine("*******************");
-
+            log.Debug("Event Id = " + entry.EventId);
         }
         private void GetCalendarId(EventEntry entry)
         {
-            Console.WriteLine("********        ***********");
-
-            Console.WriteLine(entry.Id.Uri);
-
-            Console.WriteLine("*******************");
-
+            log.Debug("Calendar Id = " + entry.Id.Uri);
         }
         private void WriteComments()
         {
